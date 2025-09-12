@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/stani/wb-order-service-grinevich/internal/cache"
-	"github.com/stani/wb-order-service-grinevich/internal/repo"
+	"github.com/Stanislav-Grinevich/wb-order-service-grinevich/internal/cache"
+	"github.com/Stanislav-Grinevich/wb-order-service-grinevich/internal/repo"
 
 	"github.com/go-chi/chi/v5"
 )

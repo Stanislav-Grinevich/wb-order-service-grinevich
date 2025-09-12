@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/stani/wb-order-service-grinevich/internal/models"
+	"github.com/Stanislav-Grinevich/wb-order-service-grinevich/internal/models"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"

@@ -1,4 +1,4 @@
-module github.com/stani/wb-order-service-grinevich
+module github.com/Stanislav-Grinevich/wb-order-service-grinevich
 
 go 1.24.4
 
@@ -15,5 +15,3 @@ require (
 	golang.org/x/sync v0.13.0 // indirect
 	golang.org/x/text v0.24.0 // indirect
 )
-
-replace github.com/stani/wb-order-service-grinevich => .

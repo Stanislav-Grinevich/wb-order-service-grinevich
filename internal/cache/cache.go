@@ -3,7 +3,7 @@ package cache
 import (
 	"sync"
 
-	"github.com/stani/wb-order-service-grinevich/internal/models"
+	"github.com/Stanislav-Grinevich/wb-order-service-grinevich/internal/models"
 )
 
 type Cache struct {
