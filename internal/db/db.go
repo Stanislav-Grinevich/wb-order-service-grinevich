@@ -1,3 +1,4 @@
+// Package db содержит функцию подключения к PostgreSQL.
 package db
 
 import (
@@ -8,6 +9,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// NewPostgresPool создаёт пул соединений к psql.
+// DSN берётся из переменной окружения POSTGRES_DSN.
 func NewPostgresPool(ctx context.Context) (*pgxpool.Pool, error) {
 	dsn := os.Getenv("POSTGRES_DSN")
 	if dsn == "" {

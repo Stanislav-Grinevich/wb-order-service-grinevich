@@ -1,3 +1,4 @@
+// Package repo — доступ к БД (Postgres) для сущности Order.
 package repo
 
 import (
@@ -11,15 +12,17 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// OrdersRepo хранит пул подключений к БД.
 type OrdersRepo struct {
 	pool *pgxpool.Pool
 }
 
+// NewOrdersRepo создаёт репозиторий заказов.
 func NewOrdersRepo(pool *pgxpool.Pool) *OrdersRepo {
 	return &OrdersRepo{pool: pool}
 }
 
-// Вставка/обновление всего заказа одной транзакцией.
+// InsertOrUpdateOrder сохраняет заказ одной транзакцией.
 func (r *OrdersRepo) InsertOrUpdateOrder(ctx context.Context, o models.Order) error {
 	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
@@ -92,12 +95,11 @@ func (r *OrdersRepo) InsertOrUpdateOrder(ctx context.Context, o models.Order) er
 		return err
 	}
 
-	// items: проще удалить и вставить заново
+	// items
 	_, err = tx.Exec(ctx, `DELETE FROM items WHERE order_uid = $1`, o.OrderUID)
 	if err != nil {
 		return err
 	}
-
 	for _, it := range o.Items {
 		_, err = tx.Exec(ctx, `
 			INSERT INTO items
@@ -112,10 +114,11 @@ func (r *OrdersRepo) InsertOrUpdateOrder(ctx context.Context, o models.Order) er
 	return tx.Commit(ctx)
 }
 
+// GetOrder возвращает заказ по order_uid из всех таблиц.
 func (r *OrdersRepo) GetOrder(ctx context.Context, id string) (models.Order, error) {
 	var o models.Order
 
-	// шапка
+	// orders
 	err := r.pool.QueryRow(ctx, `
 		SELECT order_uid, track_number, entry, locale, internal_signature, customer_id,
 		       delivery_service, shardkey, sm_id, date_created, oof_shard
@@ -127,7 +130,7 @@ func (r *OrdersRepo) GetOrder(ctx context.Context, id string) (models.Order, err
 		return models.Order{}, err
 	}
 
-	// delivery (может не быть)
+	// deliveries
 	err = r.pool.QueryRow(ctx, `
 		SELECT name, phone, zip, city, address, region, email
 		FROM deliveries WHERE order_uid = $1
@@ -137,7 +140,7 @@ func (r *OrdersRepo) GetOrder(ctx context.Context, id string) (models.Order, err
 		return models.Order{}, err
 	}
 
-	// payment (может не быть)
+	// payments
 	err = r.pool.QueryRow(ctx, `
 		SELECT transaction, request_id, currency, provider, amount, payment_dt, bank, delivery_cost, goods_total, custom_fee
 		FROM payments WHERE order_uid = $1
@@ -147,7 +150,7 @@ func (r *OrdersRepo) GetOrder(ctx context.Context, id string) (models.Order, err
 		return models.Order{}, err
 	}
 
-	// items (0..N)
+	// items
 	rows, err := r.pool.Query(ctx, `
 		SELECT chrt_id, track_number, price, rid, name, sale, size, total_price, nm_id, brand, status
 		FROM items WHERE order_uid = $1
@@ -169,6 +172,7 @@ func (r *OrdersRepo) GetOrder(ctx context.Context, id string) (models.Order, err
 	return o, nil
 }
 
+// LoadAllOrders возвращает последние N заказов по order_uid (для прогрева кэша).
 func (r *OrdersRepo) LoadAllOrders(ctx context.Context, limit int) ([]models.Order, error) {
 	if limit <= 0 {
 		limit = 1000
@@ -204,7 +208,7 @@ func (r *OrdersRepo) LoadAllOrders(ctx context.Context, limit int) ([]models.Ord
 	return out, nil
 }
 
-// Тестовая вставка — удобно для первичной проверки API.
+// InsertTestOrder вставляет демонстрационный заказ.
 func (r *OrdersRepo) InsertTestOrder(ctx context.Context) error {
 	return r.InsertOrUpdateOrder(ctx, models.Order{
 		OrderUID:          "b563feb7b2b84b6test",

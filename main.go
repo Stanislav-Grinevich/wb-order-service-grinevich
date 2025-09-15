@@ -1,3 +1,5 @@
+// Package main — точка входа в сервис wb-order-service.
+// Здесь происходит инициализация базы данных, кэша, сервера и консьюмера.
 package main
 
 /*1 вариант кода мейн
@@ -50,7 +52,6 @@ func main() {
 	rp := repo.NewOrdersRepo(pool)
 	cc := cache.New()
 
-	// прогрев кэша: если пусто — положим тестовый заказ
 	orders, err := rp.LoadAllOrders(ctx, 200)
 	if err != nil {
 		log.Fatal(err)
@@ -78,6 +79,7 @@ func main() {
 }
 */
 
+//Финальный вариант кода main.
 import (
 	"context"
 	"fmt"
@@ -97,16 +99,18 @@ import (
 )
 
 func main() {
+	// контекст для graceful shutdown
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// DB
+	// подключение к psql
 	pool, err := db.NewPostgresPool(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer pool.Close()
 
+	// репозиторий и кэш
 	rp := repo.NewOrdersRepo(pool)
 	cc := cache.New()
 
@@ -115,6 +119,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	// если БД пустая, то вставляем тестовый заказ
 	if len(orders) == 0 {
 		if err := rp.InsertTestOrder(ctx); err != nil {
 			log.Fatal(err)
@@ -124,7 +129,7 @@ func main() {
 	cc.Load(orders)
 	log.Printf("cache warmup: %d orders", len(orders))
 
-	// HTTP
+	// HTTP-сервер (API и UI)
 	srv := httpserver.New(cc, rp)
 	server := &http.Server{
 		Addr:              ":8081",
@@ -138,7 +143,7 @@ func main() {
 		}
 	}()
 
-	// Kafka consumer
+	// консьюмер
 	kcfg := kafkaconsumer.Config{
 		Brokers: splitCSV(os.Getenv("KAFKA_BROKERS")),
 		Topic:   os.Getenv("KAFKA_TOPIC"),
@@ -148,15 +153,17 @@ func main() {
 	defer consumer.Close()
 	go consumer.Run(ctx)
 
+	// ожидание окончания работы
 	<-ctx.Done()
 	log.Println("shutting down...")
 
-	// аккуратный стоп HTTP
+	// аккуратная остановка HTTP сервера
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_ = server.Shutdown(shutdownCtx)
 }
 
+// splitCSV превращает строку в массив.
 func splitCSV(s string) []string {
 	if s == "" {
 		return nil

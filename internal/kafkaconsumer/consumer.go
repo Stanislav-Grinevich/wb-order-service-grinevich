@@ -1,3 +1,4 @@
+// Package kafkaconsumer реализует чтение сообщений из Kafka и их обработку.
 package kafkaconsumer
 
 import (
@@ -14,31 +15,35 @@ import (
 	kafka "github.com/segmentio/kafka-go"
 )
 
+// Consumer обрабатывает сообщения.
 type Consumer struct {
 	reader *kafka.Reader
 	repo   *repo.OrdersRepo
 	cache  *cache.Cache
 }
 
+// Config задаёт параметры подключения к Kafka.
 type Config struct {
 	Brokers []string
 	Topic   string
 	GroupID string
 }
 
+// New создаёт консьюмера с ручным коммитом оффсетов.
 func New(cfg Config, r *repo.OrdersRepo, c *cache.Cache) *Consumer {
 	rd := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:        cfg.Brokers,
 		Topic:          cfg.Topic,
 		GroupID:        cfg.GroupID,
-		StartOffset:    kafka.LastOffset, // читаем только новые, если оффсета нет
-		CommitInterval: 0,                // ВАЖНО: выключаем авто-коммит — коммитим вручную только при успехе
+		StartOffset:    kafka.LastOffset,
+		CommitInterval: 0,
 	})
 	return &Consumer{reader: rd, repo: r, cache: c}
 }
 
 func (c *Consumer) Close() error { return c.reader.Close() }
 
+// validate проверяет обязательные поля заказа.
 func validate(o *models.Order) error {
 	if o.OrderUID == "" {
 		return errors.New("order_uid empty")
@@ -52,6 +57,7 @@ func validate(o *models.Order) error {
 	return nil
 }
 
+// Run запускает бесконечный цикл чтения и обработки сообщений Kafka.
 func (c *Consumer) Run(ctx context.Context) {
 	log.Println("[kafka] consumer started")
 	for {
@@ -71,33 +77,28 @@ func (c *Consumer) Run(ctx context.Context) {
 		var o models.Order
 		if err := json.Unmarshal(payload, &o); err != nil {
 			log.Printf("[kafka] bad json (offset %d): %v", m.Offset, err)
-			// не коммитим → сообщение будет перечитано этой же группой позже (по таймауту/ребалансу)
 			continue
 		}
 		if err := validate(&o); err != nil {
 			log.Printf("[kafka] invalid order (offset %d): %v", m.Offset, err)
-			// можно коммитить, если хотим «похоронить» мусорные сообщения.
-			// но по ТЗ допускается игнор/логирование. Оставим без коммита, чтобы не терять при желании расследовать.
 			continue
 		}
 
-		// Пишем в БД одной транзакцией
+		// запись в БД
 		if err := c.repo.InsertOrUpdateOrder(ctx, o); err != nil {
 			log.Printf("[kafka] db error (offset %d): %v", m.Offset, err)
-			// оффсет не коммитим → сообщение обработается повторно позже
-			continue
+			continue // без коммита → сообщение повторится
 		}
 
-		// Обновляем кэш
+		// обновление кэша
 		c.cache.Set(o)
 
-		// Видимый лог успеха
+		// лог успешной обработки
 		log.Printf("[kafka] stored order %s (offset %d)", o.OrderUID, m.Offset)
 
-		// Ручной коммит только после успешной записи
+		// ручной коммит оффсета
 		if err := c.reader.CommitMessages(ctx, m); err != nil {
 			log.Printf("[kafka] commit error (offset %d): %v", m.Offset, err)
-			// Ничего не делаем: при ошибке коммита сообщение придёт снова
 		}
 	}
 }

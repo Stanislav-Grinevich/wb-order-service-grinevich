@@ -13,24 +13,24 @@ import (
 )
 
 func main() {
-	// Читаем параметры из переменных окружения:
+	// Читаем параметры из переменных окружения
 	// KAFKA_BROKERS — список брокеров, KAFKA_TOPIC   — название топика
 	brokers := env("KAFKA_BROKERS", "localhost:9092")
 	topic := env("KAFKA_TOPIC", "wb_orders")
 
-	// Аргумент командной строки должен содержать путь до JSONa.
+	// аргумент командной строки должен содержать путь до JSONa
 	if len(os.Args) < 2 {
 		log.Fatalf("usage: producer <path-to-json> (например: model.json)")
 	}
 	path := os.Args[1]
 
-	// Читаем содержимое файла в память.
+	// читаем содержимое файла в память
 	body, err := os.ReadFile(path)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Создаём и настриваем Kafka writer.
+	// создаём и настриваем Kafka writer
 	w := &kafka.Writer{
 		Addr:         kafka.TCP(splitCSV(brokers)...),
 		Topic:        topic,
@@ -40,13 +40,13 @@ func main() {
 	}
 	defer w.Close()
 
-	// Собираем сообщение.
+	// собираем сообщение
 	msg := kafka.Message{
 		Value: body,
 		Time:  time.Now(),
 	}
 
-	// Пишем сообщение.
+	// пишем сообщение
 	if err := w.WriteMessages(context.Background(), msg); err != nil {
 		log.Fatal("write:", err)
 	}
