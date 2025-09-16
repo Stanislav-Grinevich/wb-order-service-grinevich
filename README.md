@@ -1,5 +1,4 @@
-@'
-# WB Order Service
+﻿# WB Order Service
 
 ## Предпосылки
 - Docker + Docker Compose
@@ -31,7 +30,6 @@ GET http://localhost:8081/healthz
 UI: http://localhost:8081/
 
 ## Troubleshooting
-- Если продюсер/консьюмер лезет в [::1]:9092 — выставь KAFKA_BROKERS=127.0.0.1:9092.
-- Если отправляешь старое сообщение новой группе — StartOffset=LastOffset, пришли заново или смени группу.
-- Если JSON с BOM — консьюмер его обрежет (есть TrimPrefix).
-'@ | Set-Content -Encoding utf8 -NoNewline .\README.md
+- Если продюсер/консьюмер лезет в [::1]:9092  выставь KAFKA_BROKERS=127.0.0.1:9092.
+- Если отправляешь старое сообщение новой группе  StartOffset=LastOffset, пришли заново или смени группу.
+- Если JSON с BOM  консьюмер его обрежет (есть TrimPrefix).
